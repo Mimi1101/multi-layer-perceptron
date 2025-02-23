@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from abc import ABC, abstractmethod
 from typing import Tuple
+import matplotlib.pyplot as plt
+
 
 
 def batch_generator(train_x, train_y, batch_size):
@@ -14,19 +16,16 @@ def batch_generator(train_x, train_y, batch_size):
 
     :return tuple: (batch_x, batch_y) where batch_x has shape (B, f) and batch_y has shape (B, q). The last batch may be smaller.
     """
-    shape = train_x.shape[0]
+    number_of_samples = train_x.shape[0]
 
-    indices = np.arange(shape)
+    indices = np.arange(number_of_samples)
     np.random.shuffle(indices)
 
-    for start_index in range(0, n, batch_size):
-
+    for start_index in range(0, number_of_samples, batch_size):
         last_index = start_index + batch_size
+        batch_indices=indices[start_index:last_index]
+        yield train_x[batch_indices], train_y[batch_indices]
 
-
-
-
-    
 
 
 class ActivationFunction(ABC):
@@ -56,8 +55,7 @@ class Sigmoid(ActivationFunction):
         return 1/(1+np.exp(-x))
 
     def derivative(self, x: np.ndarray) -> np.ndarray:
-        s = self.forward(x)
-        return s*(1-s)
+        return x*(1-x)
     
 
 
@@ -66,8 +64,7 @@ class Tanh(ActivationFunction):
         return np.tanh(x)
 
     def derivative(self, x: np.ndarray) -> np.ndarray:
-        tanh_x = self.forward(x)
-        return 1 - tanh_x ** 2
+        return 1 - x ** 2
 
 
 
@@ -89,18 +86,12 @@ class Softmax(ActivationFunction):
 
     def derivative(self, x: np.ndarray, axis: int = -1) -> np.ndarray:
         s = self.forward(x, axis=axis)
-        
-        # If s is a 1D array, return a 2D Jacobian
-        if s.ndim == 1:
-            jacobian = np.diag(s) - np.outer(s, s)
-            return jacobian
-        else:
-            batch_size, n = s.shape
-            jacobian = np.empty((batch_size, n, n))
-            for i in range(batch_size):
-                # Compute the Jacobian for each sample in the batch
-                jacobian[i] = np.diag(s[i]) - np.outer(s[i], s[i])
-            return jacobian
+        batch_size, n = x.shape
+        jacobian = np.empty((batch_size, n, n))
+        for i in range(batch_size):
+            # Compute the Jacobian for each sample in the batch
+            jacobian[i] = np.diag(s[i]) - np.outer(s[i], s[i])
+        return jacobian
 
 class Linear(ActivationFunction):
     def forward(self, x: np.ndarray) -> np.ndarray:
@@ -188,8 +179,11 @@ class Layer:
         :param delta: delta term from layer above
         :return: (weight gradients, bias gradients)
         """
-        activation_function_derivative = self.activation_function.derivative(self.activations)
-        self.delta = delta * activation_function_derivative
+        if isinstance(self.activation_function, Softmax):
+            self.delta = delta
+        else:
+            activation_function_derivative = self.activation_function.derivative(self.activations)
+            self.delta = delta * activation_function_derivative
         dL_dW = np.dot(h.T, self.delta)
         dL_db = np.sum(self.delta, axis=0)
         return dL_dW, dL_db
@@ -203,32 +197,28 @@ class MultilayerPerceptron:
         """
         self.layers = layers
 
-    def forward(self, x: np.ndarray) -> np.ndarray:
+    def forward(self, x: np.ndarray) -> Tuple[np.ndarray, list]:
         """
         This takes the network input and computes the network output (forward propagation)
         :param x: network input
-        :return: network output
+        :return: network output, list of inputs to each layer including the input data
         """
+        cache = [x]
         output = x
         for layer in self.layers:
             output = layer.forward(output)
+            cache.append(output)
 
-        return output
+        return output, cache
 
-    def backward(self, loss_grad: np.ndarray, input_data: np.ndarray) -> Tuple[list, list]:
+    def backward(self, loss_grad: np.ndarray, cache:list) -> Tuple[list, list]:
         """
         Applies backpropagation to compute the gradients of the weights and biases for all layers in the network
         :param loss_grad: gradient of the loss function
-        :param input_data: network's input data
+        :param cache: list of activations from the forward pass
         :return: (List of weight gradients for all layers, List of bias gradients for all layers)
         """
-        input_layers = [input_data]
-        out = input_data
-        #Now we do forward pass to get the inputs for each layer and get an output at the end
-        for layer in self.layers:
-            out = layer.forward(out)
-            input_layers.append(out)
-
+        
         dl_dw_all = []
         dl_db_all = []
         delta = loss_grad
@@ -237,13 +227,13 @@ class MultilayerPerceptron:
         for i in reversed(range(len(self.layers))):
             layer = self.layers[i]
             # the input we feed into layer i
-            h=input_layers[i]
+            h=cache[i]
             # calculate the weight and bias gradient
             dL_dW, dL_db = layer.backward(h, delta)
             # add the weight and bias gradients to the list
             dl_dw_all.append(dL_dW)
             dl_db_all.append(dL_db)
-            # computing the delta for the previous layer
+            # computing the delta for the previous layer, still confused about this ask 
             if i>0:
                 delta = np.dot(layer.delta, layer.W.T)
 
@@ -266,7 +256,39 @@ class MultilayerPerceptron:
         :param epochs: number of epochs
         :return:
         """
-        training_losses = None
-        validation_losses = None
+        training_losses = []
+        validation_losses = []
 
-        return training_losses, validation_losses
+       
+        for epoch in range(epochs):
+            training_loss_for_epoch = 0.0
+            num_batches = 0
+
+            for batch_x, batch_y in batch_generator(train_x, train_y, batch_size):
+                y_pred, cache = self.forward(batch_x)
+                batch_loss = loss_func.loss(batch_y, y_pred)
+                loss_value = np.mean(batch_loss)
+                training_loss_for_epoch += loss_value
+                num_batches +=1
+                loss_gradient = loss_func.derivative(batch_y, y_pred)
+                dW_all, db_all = self.backward(loss_gradient, cache)
+
+                for i, layer in enumerate(self.layers):
+                    layer.W -= learning_rate * dW_all[i]
+                    layer.b -= learning_rate * db_all[i]
+            #why this should be average
+            average_training_loss = training_loss_for_epoch/num_batches
+            training_losses.append(average_training_loss)
+
+            val_pred, _ = self.forward(val_x)
+            val_loss_values = loss_func.loss(val_y, val_pred)
+            avg_val_loss = np.mean(val_loss_values)
+            validation_losses.append(avg_val_loss)
+
+            print(f"Current epoch: {epoch+1}/{epochs}")
+            print(f"Training Loss: {average_training_loss:.4f}")
+            print(f"Validation Loss: {avg_val_loss:.4f}")
+
+
+
+        return np.array(training_losses), np.array(validation_losses)
