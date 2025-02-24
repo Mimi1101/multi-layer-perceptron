@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from abc import ABC, abstractmethod
 from typing import Tuple
-import matplotlib.pyplot as plt
+
 
 
 
