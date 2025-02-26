@@ -2,9 +2,8 @@ import numpy as np
 import struct
 from array import array
 import matplotlib.pyplot as plt
-import random
 from sklearn.model_selection import train_test_split
-from mlp import Softmax, CrossEntropy, Layer, MultilayerPerceptron, Tanh, Relu
+from mlp import Softmax, CrossEntropy, Layer, MultilayerPerceptron, Dropout, Relu
 
 
 
@@ -90,12 +89,14 @@ def main():
     print("One-hot encoded training labels shape:", y_train.shape)  # Expected: (48000, 10)
 
     Layer1 = Layer(fan_in=784, fan_out=512, activation_function=Relu())
+    drop1 = Dropout(rate = 0.3)
     Layer2 = Layer(fan_in=512, fan_out=256, activation_function=Relu())
+    drop2 = Dropout(rate = 0.3)
     Layer3 = Layer(fan_in=256, fan_out=128, activation_function=Relu())
     Layer4 = Layer(fan_in=128, fan_out=64, activation_function=Relu())
     Layer5 = Layer(fan_in=64, fan_out=10, activation_function=Softmax())
 
-    model = MultilayerPerceptron(layers=(Layer1, Layer2, Layer3, Layer4, Layer5))
+    model = MultilayerPerceptron(layers=(Layer1, drop1, Layer2, drop2, Layer3, Layer4, Layer5))
     loss_function = CrossEntropy()
     learning_rate = 0.001
     batch_size = 32
@@ -113,7 +114,7 @@ def main():
         epochs=epochs
     )
 
-    y_pred, _ = model.forward(x_test)
+    y_pred, _ = model.forward(x_test, training = False)
     predictions = np.argmax(y_pred, axis=1)
     true_labels = np.argmax(y_test, axis=1)
     accuracy = np.mean(predictions == true_labels)
@@ -127,6 +128,22 @@ def main():
     plt.title("Training and Validation Loss Curves")
     plt.legend()
     plt.show()
+
+    #one test sample for each digit
+    # Select one test sample for each digit (0-9)
+    fig, axes = plt.subplots(1, 10, figsize=(15, 2))
+    for digit in range(10):
+        indices = np.where(true_labels == digit)[0]
+        if len(indices) > 0:
+            index = indices[0]  # select the first occurrence for this digit
+            image = x_test[index].reshape(28, 28)
+            pred_digit = predictions[index]
+            axes[digit].imshow(image, cmap='gray')
+            axes[digit].set_title(f"Pred: {pred_digit}")
+            axes[digit].axis('off')
+    plt.suptitle("One Test Sample per Class with Predicted Labels")
+    plt.show()
+
 
 if __name__ == "__main__":
     main()

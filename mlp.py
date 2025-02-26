@@ -26,7 +26,24 @@ def batch_generator(train_x, train_y, batch_size):
         batch_indices=indices[start_index:last_index]
         yield train_x[batch_indices], train_y[batch_indices]
 
+class Dropout:
+    def __init__(self, rate):
+        self.rate = rate
+        self.mask = None
 
+    def forward(self, x, training=True):
+        if training:
+           random_numbers_shape_x = np.random.rand(*x.shape)
+           self.mask = (random_numbers_shape_x > self.rate).astype(x.dtype)
+           return x*self.mask
+        else:
+            return x*(1-self.rate)
+        
+    def backward(self, h, delta):
+        return delta * self.mask, None
+
+
+        
 
 class ActivationFunction(ABC):
     @abstractmethod
@@ -197,7 +214,7 @@ class MultilayerPerceptron:
         """
         self.layers = layers
 
-    def forward(self, x: np.ndarray) -> Tuple[np.ndarray, list]:
+    def forward(self, x: np.ndarray, training=True) -> Tuple[np.ndarray, list]:
         """
         This takes the network input and computes the network output (forward propagation)
         :param x: network input
@@ -206,7 +223,10 @@ class MultilayerPerceptron:
         cache = [x]
         output = x
         for layer in self.layers:
-            output = layer.forward(output)
+            if isinstance(layer, Dropout):
+                output = layer.forward(output, training=training)
+            else:
+                output = layer.forward(output)
             cache.append(output)
 
         return output, cache
@@ -233,9 +253,12 @@ class MultilayerPerceptron:
             # add the weight and bias gradients to the list
             dl_dw_all.append(dL_dW)
             dl_db_all.append(dL_db)
-            # computing the delta for the previous layer, still confused about this ask 
+            # computing the delta for the previous layer, still confused about this ask
             if i>0:
-                delta = np.dot(layer.delta, layer.W.T)
+                if hasattr(layer, 'W'):
+                    delta = np.dot(layer.delta, layer.W.T)
+                else:
+                    delta = delta
 
         dl_dw_all.reverse()
         dl_db_all.reverse()
@@ -274,13 +297,14 @@ class MultilayerPerceptron:
                 dW_all, db_all = self.backward(loss_gradient, cache)
 
                 for i, layer in enumerate(self.layers):
-                    layer.W -= learning_rate * dW_all[i]
-                    layer.b -= learning_rate * db_all[i]
+                    if hasattr(layer, 'W'):
+                        layer.W -= learning_rate * dW_all[i]
+                        layer.b -= learning_rate * db_all[i]
             #why this should be average
             average_training_loss = training_loss_for_epoch/num_batches
             training_losses.append(average_training_loss)
 
-            val_pred, _ = self.forward(val_x)
+            val_pred, _ = self.forward(val_x, training = False)
             val_loss_values = loss_func.loss(val_y, val_pred)
             avg_val_loss = np.mean(val_loss_values)
             validation_losses.append(avg_val_loss)
