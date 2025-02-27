@@ -27,6 +27,10 @@ def batch_generator(train_x, train_y, batch_size):
         yield train_x[batch_indices], train_y[batch_indices]
 
 class Dropout:
+    """
+    Implementing a dropout layer to randomly set the activations to zero during training tp prevent overfitting.
+    :param rate: probability of dropping a neuron
+    """
     def __init__(self, rate):
         self.rate = rate
         self.mask = None
@@ -130,21 +134,15 @@ class LossFunction(ABC):
 
 class SquaredError(LossFunction):
     def loss(self, y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
-        # If y_true is one-dimensional, calculate element-wise loss.
-        if y_true.ndim == 1:
-            return 0.5 * (y_pred - y_true) ** 2
-        else:
-            # For multi-dimensional outputs, sum the squared differences for each sample.
-            return 0.5 * np.sum((y_pred - y_true) ** 2, axis=1)
+        return 0.5 * (y_pred - y_true) ** 2
 
     def derivative(self, y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
         return y_pred - y_true
 
 class CrossEntropy(LossFunction):
     def loss(self, y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
-        # Clip predictions to avoid log(0)
+        # clipping predictions to avoid log(0)
         y_pred_clipped = np.clip(y_pred, 1e-12, 1.0)
-        # Compute loss for each sample; sum over classes (axis=1)
         return -np.sum(y_true * np.log(y_pred_clipped), axis=1)
 
     def derivative(self, y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
@@ -253,7 +251,7 @@ class MultilayerPerceptron:
             # add the weight and bias gradients to the list
             dl_dw_all.append(dL_dW)
             dl_db_all.append(dL_db)
-            # computing the delta for the previous layer, still confused about this ask
+            # computing the delta for the previous layer
             if i>0:
                 if hasattr(layer, 'W'):
                     delta = np.dot(layer.delta, layer.W.T)
@@ -300,7 +298,7 @@ class MultilayerPerceptron:
                     if hasattr(layer, 'W'):
                         layer.W -= learning_rate * dW_all[i]
                         layer.b -= learning_rate * db_all[i]
-            #why this should be average
+            
             average_training_loss = training_loss_for_epoch/num_batches
             training_losses.append(average_training_loss)
 

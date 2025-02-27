@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
+#getting and cleaning the data
 auto_mpg = fetch_ucirepo(id=9)
 
 x = auto_mpg.data.features #only has numerical features, 7 columns
@@ -66,8 +67,7 @@ y_train_np = y_train.to_numpy().reshape(-1, 1)
 y_val_np = y_val.to_numpy().reshape(-1, 1)
 y_test_np = y_test.to_numpy().reshape(-1, 1)
 
-
-
+#Initializing the layers
 layer_one = Layer(fan_in=7, fan_out=32, activation_function=Relu())
 layer_two = Layer(fan_in=32, fan_out=16, activation_function=Relu())
 layer_three = Layer(fan_in = 16, fan_out=8, activation_function=Relu() )
@@ -101,7 +101,7 @@ np.random.seed(42)
 indices = np.random.choice(range(x_test_np.shape[0]), size=10, replace=False)
 selected_true = y_test_np[indices].flatten()
 selected_pred = test_predictions[indices].flatten()
-# De-standardize the selected true and predicted values
+# de standardizing the selected true and predicted values
 selected_true_orig = selected_true * y_std + y_mean
 selected_pred_orig = selected_pred * y_std + y_mean
 

@@ -8,6 +8,9 @@ from mlp import Softmax, CrossEntropy, Layer, MultilayerPerceptron, Dropout, Rel
 
 
 class MnistDataloader(object):
+    """
+    Load and preprocess the MNIST dataset
+    """
     def __init__(self, training_images_filepath, training_labels_filepath, test_images_filepath, test_labels_filepath):
         self.training_images_filepath = training_images_filepath
         self.training_labels_filepath = training_labels_filepath
@@ -46,6 +49,9 @@ def one_hot_encode(labels, num_classes=10):
     return np.eye(num_classes)[labels]
 
 def main():
+    """
+    Load data, train an MLP model and evaluate it;s performance.
+    """
     training_images_filepath ='train-images-idx3-ubyte'
     training_labels_filepath = 'train-labels-idx1-ubyte'
     test_images_filepath = 't10k-images-idx3-ubyte'
@@ -70,7 +76,7 @@ def main():
     x_train = x_train.reshape(x_train.shape[0], -1) 
     x_test = x_test.reshape(x_test.shape[0], -1)    
    
-    # normalizing for pixel stability
+    # normalizing for stability
     x_train = x_train.astype('float32') / 255.0
     x_test = x_test.astype('float32') / 255.0
 
@@ -81,12 +87,12 @@ def main():
     y_train = one_hot_encode(y_train, num_classes=10)
     y_val   = one_hot_encode(y_val, num_classes=10)
     y_test  = one_hot_encode(y_test, num_classes=10)
-    # Print out the shapes after splitting.
+    # printinhout the shapes after splitting.
     print("After splitting:")
-    print("Training set shape:", x_train.shape)   # Expected ~ (48000, 784)
-    print("Validation set shape:", x_val.shape)     # Expected ~ (12000, 784)
+    print("Training set shape:", x_train.shape)   # Expected (48000, 784)
+    print("Validation set shape:", x_val.shape)     # Expected (12000, 784)
     print("Test set shape:", x_test.shape)          # Expected (10000, 784)
-    print("One-hot encoded training labels shape:", y_train.shape)  # Expected: (48000, 10)
+    print("One-hot encoded training labels shape:", y_train.shape)  #Expected: (48000, 10)
 
     Layer1 = Layer(fan_in=784, fan_out=512, activation_function=Relu())
     drop1 = Dropout(rate = 0.3)
@@ -114,12 +120,14 @@ def main():
         epochs=epochs
     )
 
+    #test prediction
     y_pred, _ = model.forward(x_test, training = False)
     predictions = np.argmax(y_pred, axis=1)
     true_labels = np.argmax(y_test, axis=1)
     accuracy = np.mean(predictions == true_labels)
     print(f"\nTest set accuracy: {accuracy * 100:.2f}%")
 
+    #loss curves
     plt.figure(figsize=(10, 5))
     plt.plot(training_losses, label="Training Loss")
     plt.plot(validation_losses, label="Validation Loss")
@@ -130,12 +138,11 @@ def main():
     plt.show()
 
     #one test sample for each digit
-    # Select one test sample for each digit (0-9)
-    fig, axes = plt.subplots(1, 10, figsize=(15, 2))
+    _, axes = plt.subplots(1, 10, figsize=(15, 2))
     for digit in range(10):
         indices = np.where(true_labels == digit)[0]
         if len(indices) > 0:
-            index = indices[0]  # select the first occurrence for this digit
+            index = indices[0]  
             image = x_test[index].reshape(28, 28)
             pred_digit = predictions[index]
             axes[digit].imshow(image, cmap='gray')
